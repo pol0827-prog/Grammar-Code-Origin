@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 선생님 구글 계정 (프로그램 설정의 teacherEmail과 같아야 함)
+    function teacher() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == "pol0827@goedu.kr";
+    }
+    // 학생 각자의 기록: 로그인한 본인만 읽고 쓰기 (이 앱은 gel_ 이름표)
+    match /data/users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    // ▼ 문법 요소 마스터 챌린지 (2026-10-17 덧붙임)
+    match /gel_scores/{uid} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.best is number
+        && request.resource.data.name is string
+        && request.resource.data.name.size() < 40;
+      allow delete: if teacher();
+    }
+    match /gel_board/{uid} {
+      allow read, delete: if teacher();
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /gel_fixes/{id} {
+      allow read: if request.auth != null;
+      allow create, update: if teacher()
+        && request.resource.data.key is string
+        && request.resource.data.key.size() < 400;
+      allow delete: if teacher();
+    }
+    // ▲ 문법 요소 마스터 챌린지
+    // 그 밖의 경로는 모두 막음
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
